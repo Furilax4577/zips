@@ -1,0 +1,31 @@
+{
+  "name": "zips",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/Furilax4577/zips#readme",
+  "bugs": {
+    "url": "https://github.com/Furilax4577/zips/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Furilax4577/zips.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "npx ts-node src/main.ts"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.9",
+    "@types/ws": "^8.18.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.1"
+  }
+}
