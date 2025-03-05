@@ -2,6 +2,14 @@
 import express from "express";
 import * as http from "http";
 import { WebSocketServer } from "ws";
+import mqtt from "mqtt";
+
+interface ZendureMqttConfig {
+  appKey: string;
+  secret: string;
+  mqttUrl: string;
+  port: number;
+}
 
 const PORT = process.env.PORT || 3000;
 
@@ -18,6 +26,7 @@ const server = http.createServer(app);
 
 // 3) Attache un WebSocketServer sur ce serveur HTTP
 const wss = new WebSocketServer({ server });
+const client = mqtt.connect("mqtt://test.mosquitto.org");
 
 // 4) Gérer la connexion WebSocket
 wss.on("connection", (socket) => {
@@ -27,7 +36,7 @@ wss.on("connection", (socket) => {
   socket.on("message", (message) => {
     console.log("Message reçu du client :", message.toString());
     // On peut répondre
-    socket.send("Pong depuis Express + WS en TypeScript");
+    socket.send(JSON.stringify({ message: "salut" }));
   });
 
   // Quand le client se déconnecte
