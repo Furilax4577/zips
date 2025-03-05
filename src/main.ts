@@ -2,7 +2,7 @@
 import express from "express";
 import * as http from "http";
 import { WebSocketServer } from "ws";
-import mqtt from "mqtt";
+import { connect, MqttClient } from "mqtt";
 
 interface ZendureMqttConfig {
   appKey: string;
@@ -12,6 +12,7 @@ interface ZendureMqttConfig {
 }
 
 const PORT = process.env.PORT || 3000;
+const mqttSessions: { [key: string]: MqttClient } = {};
 
 // 1) Crée l'application Express
 const app = express();
@@ -26,7 +27,6 @@ const server = http.createServer(app);
 
 // 3) Attache un WebSocketServer sur ce serveur HTTP
 const wss = new WebSocketServer({ server });
-const client = mqtt.connect("mqtt://test.mosquitto.org");
 
 // 4) Gérer la connexion WebSocket
 wss.on("connection", (socket) => {
@@ -35,8 +35,39 @@ wss.on("connection", (socket) => {
   // Quand on reçoit un message du client
   socket.on("message", (message) => {
     console.log("Message reçu du client :", message.toString());
-    // On peut répondre
-    socket.send(JSON.stringify({ message: "salut" }));
+
+    const mqttConfig = JSON.parse(message.toString()) as ZendureMqttConfig;
+
+    const mqttSession = connect(`mqtt://${mqttConfig.mqttUrl}`, {
+      username: mqttConfig.appKey,
+      password: mqttConfig.secret,
+      port: mqttConfig.port,
+      protocolId: "MQTT",
+      protocolVersion: 5,
+    });
+
+    mqttSession.on("connect", () => {
+      mqttSession.subscribe(`${mqttConfig.appKey}/#`, (error) => {
+        if (!error) {
+          console.log("Connected!");
+        } else {
+          console.log("Error:", error);
+        }
+      });
+    });
+
+    mqttSession.on("message", (topic, message) => {
+      // message is Buffer
+      console.log(topic);
+      socket.send(
+        JSON.stringify({ topic, message: JSON.parse(message.toString()) })
+      );
+      mqttSession.end();
+    });
+
+    mqttSession.on("error", (error) => {
+      console.log("error", error);
+    });
   });
 
   // Quand le client se déconnecte
