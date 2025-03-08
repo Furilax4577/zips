@@ -1,8 +1,9 @@
 // src/server.ts
 import express from "express";
 import * as http from "http";
-import { WebSocketServer } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import { connect, MqttClient } from "mqtt";
+import { randomUUID } from "crypto";
 
 interface ZendureMqttConfig {
   appKey: string;
@@ -12,7 +13,7 @@ interface ZendureMqttConfig {
 }
 
 const PORT = process.env.PORT || 3000;
-const mqttSessions: { [key: string]: MqttClient } = {};
+const clients = new Map<WebSocket, { uuid: string; mqttClient?: MqttClient }>();
 
 // 1) Crée l'application Express
 const app = express();
@@ -28,12 +29,18 @@ const server = http.createServer(app);
 // 3) Attache un WebSocketServer sur ce serveur HTTP
 const wss = new WebSocketServer({ server });
 
+setInterval(() => {
+  console.log(`Nombre de client connectés ${clients.size}`);
+}, 60000);
+
 // 4) Gérer la connexion WebSocket
-wss.on("connection", (socket) => {
+wss.on("connection", (ws, request) => {
   console.log("Client WebSocket connecté");
 
+  clients.set(ws, { uuid: randomUUID() });
+
   // Quand on reçoit un message du client
-  socket.on("message", (message) => {
+  ws.on("message", (message) => {
     console.log("Message reçu du client :", message.toString());
 
     const mqttConfig = JSON.parse(message.toString()) as ZendureMqttConfig;
@@ -45,6 +52,7 @@ wss.on("connection", (socket) => {
       protocolId: "MQTT",
       protocolVersion: 5,
     });
+    clients.get(ws)!.mqttClient = mqttSession;
 
     mqttSession.on("connect", () => {
       mqttSession.subscribe(`${mqttConfig.appKey}/#`, (error) => {
@@ -59,10 +67,9 @@ wss.on("connection", (socket) => {
     mqttSession.on("message", (topic, message) => {
       // message is Buffer
       console.log(topic);
-      socket.send(
+      ws.send(
         JSON.stringify({ topic, message: JSON.parse(message.toString()) })
       );
-      mqttSession.end();
     });
 
     mqttSession.on("error", (error) => {
@@ -71,8 +78,12 @@ wss.on("connection", (socket) => {
   });
 
   // Quand le client se déconnecte
-  socket.on("close", () => {
+  ws.on("close", () => {
     console.log("Client WebSocket déconnecté");
+    if (clients.get(ws)?.mqttClient) {
+      clients.get(ws)!.mqttClient!.end();
+    }
+    clients.delete(ws);
   });
 });
 
